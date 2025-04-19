@@ -5,24 +5,19 @@
       "src": "server.js",
       "use": "@vercel/node",
       "config": {
-        "installCommand": "npm install --platform=linux --arch=x64 sharp"
+        "installCommand": "npm install --platform=linux --arch=x64 sharp@0.32.6"
       }
     }
   ],
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "/server.js",
-      "headers": {
-        "Access-Control-Allow-Credentials": "true",
-        "Access-Control-Allow-Origin": "https://rapidfecto.netlify.app",
-        "Access-Control-Allow-Methods": "GET,OPTIONS,PATCH,DELETE,POST,PUT",
-        "Access-Control-Allow-Headers": "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization"
-      }
+      "dest": "/server.js"
     }
   ],
   "env": {
     "NODE_ENV": "production",
-    "SHARP_IGNORE_GLOBAL_LIBVIPS": "1"
+    "SHARP_IGNORE_GLOBAL_LIBVIPS": "1",
+    "SHARP_PATH": "/tmp/node_modules/sharp"
   }
 }
