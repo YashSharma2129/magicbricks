@@ -25,16 +25,25 @@ requiredEnvVars.forEach(envVar => {
 });
 
 // Initialize sharp with error handling
+// Initialize sharp with error handling
 let sharpInstance;
 try {
-  const sharp = await import('sharp');
-  sharpInstance = sharp.default;
-  console.log('✅ Sharp initialized successfully');
+  if (process.env.NODE_ENV === 'production') {
+    const sharp = await import('sharp');
+    sharpInstance = sharp.default;
+    console.log('✅ Sharp initialized successfully in production');
+  } else {
+    const sharp = await import('sharp');
+    sharpInstance = sharp.default;
+    console.log('✅ Sharp initialized successfully in development');
+  }
 } catch (error) {
   console.error('❌ Error initializing Sharp:', error);
-  process.exit(1);
+  // Don't exit process in production, just log the error
+  if (process.env.NODE_ENV !== 'production') {
+    process.exit(1);
+  }
 }
-
 const app = express();
 const PORT = process.env.PORT || 5000;
 
