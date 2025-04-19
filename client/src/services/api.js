@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const baseURL = import.meta.env.PROD 
-  ? 'https://your-deployed-backend.com/api'
+  ? 'https://magicbricks-phi.vercel.app/api'
   : 'http://localhost:5000/api';
 
 const api = axios.create({ baseURL });
