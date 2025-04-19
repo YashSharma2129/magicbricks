@@ -1,8 +1,10 @@
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { FaBed, FaBath, FaRulerCombined, FaMapMarkerAlt, FaHeart } from 'react-icons/fa';
 import { motion } from 'framer-motion';
-import { noImageBase64 } from '../assets/no-image.js';
-import { fadeInUp, scaleOnHover } from '../utils/animations';
+import { toggleFavorite } from '../services/api';
+import useAuthStore from '../store/authStore';
+import { useLoading } from '../hooks/useLoading';
 
 const formatPrice = (price) => {
   if (!price && price !== 0) return 'Price on request';
@@ -10,6 +12,31 @@ const formatPrice = (price) => {
 };
 
 const PropertyCard = ({ property }) => {
+  const { isAuthenticated } = useAuthStore();
+  const navigate = useNavigate();
+  const { setLoading } = useLoading();
+  const [isFavorited, setIsFavorited] = useState(property.isFavorited || false);
+  const [favoritesCount, setFavoritesCount] = useState(property.favoritesCount || 0);
+
+  const handleFavoriteClick = async (e) => {
+    e.preventDefault(); // Prevent navigation
+    if (!isAuthenticated()) {
+      navigate('/login');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await toggleFavorite(property._id);
+      setIsFavorited(response.data.isFavorited);
+      setFavoritesCount(response.data.favoritesCount);
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const {
     _id,
     title = 'Untitled Property',
@@ -22,8 +49,7 @@ const PropertyCard = ({ property }) => {
     size,
     images = [],
     featured = false,
-    coordinates,
-    favoritesCount = 0
+    coordinates
   } = property || {};
 
   const hasValidCoordinates = coordinates && 
@@ -32,8 +58,8 @@ const PropertyCard = ({ property }) => {
 
   return (
     <motion.div
-      {...fadeInUp}
-      {...scaleOnHover}
+      // {...fadeInUp}
+      // {...scaleOnHover}
       className="bg-white rounded-xl shadow-soft overflow-hidden hover:shadow-lg transform hover:-translate-y-1 transition-all duration-300"
     >
       <Link to={`/property/${_id}`} className="block">
@@ -44,7 +70,7 @@ const PropertyCard = ({ property }) => {
               initial={{ scale: 1 }}
               whileHover={{ scale: 1.05 }}
               transition={{ duration: 0.3 }}
-              src={images[0] || noImageBase64}
+              src={images[0]}
               alt={title}
               className="w-full h-full object-cover brightness-95 hover:brightness-100"
               onError={(e) => { e.target.src = noImageBase64; }}
@@ -61,12 +87,6 @@ const PropertyCard = ({ property }) => {
                 Featured
               </motion.span>
             )}
-
-            {/* Favorites count */}
-            <div className="absolute top-4 left-4 flex items-center gap-1 bg-white/90 px-2 py-1 rounded-full text-xs font-medium text-gray-700">
-              <FaHeart className="text-red-500" />
-              <span>{favoritesCount}</span>
-            </div>
 
             {/* Price tag */}
             <div className="absolute bottom-4 left-4 right-4">
@@ -126,6 +146,20 @@ const PropertyCard = ({ property }) => {
           </div>
         </div>
       </Link>
+
+      <button
+        onClick={handleFavoriteClick}
+        className={`absolute top-4 right-4 p-2 rounded-full ${
+          isFavorited ? 'bg-red-500 text-white' : 'bg-white/80 text-gray-600'
+        } hover:scale-110 transition-all z-10`}
+      >
+        <FaHeart className="text-xl" />
+        {favoritesCount > 0 && (
+          <span className="absolute -bottom-2 -right-2 bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+            {favoritesCount}
+          </span>
+        )}
+      </button>
     </motion.div>
   );
 };

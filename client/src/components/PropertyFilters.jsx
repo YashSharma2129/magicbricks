@@ -1,23 +1,39 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FaFilter, FaSearch, FaRupeeSign, FaBed, FaHome } from 'react-icons/fa';
+import usePropertyStore from '../store/propertyStore';
+import { useSearchParams } from 'react-router-dom';
 
-const PropertyFilters = ({ onFilterChange }) => {
+const PropertyFilters = () => {
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
-  const [filters, setFilters] = useState({
-    search: '',
-    propertyType: '',
-    minPrice: '',
-    maxPrice: '',
-    bedrooms: '',
-    furnished: ''
-  });
+  const { filters, setFilters, fetchProperties } = usePropertyStore();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    // Initialize filters from URL params
+    const initialFilters = {};
+    for (const [key, value] of searchParams.entries()) {
+      initialFilters[key] = value;
+    }
+    setFilters(initialFilters);
+    fetchProperties();
+  }, []);
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     const newFilters = { ...filters, [name]: value };
+    
+    // Update URL params
+    if (value) {
+      searchParams.set(name, value);
+    } else {
+      searchParams.delete(name);
+    }
+    setSearchParams(searchParams);
+
+    // Update store and fetch properties
     setFilters(newFilters);
-    onFilterChange?.(newFilters);
+    fetchProperties();
   };
 
   const propertyTypes = ['Any Type', 'House', 'Apartment', 'Villa', 'Plot', 'Commercial'];
@@ -32,7 +48,7 @@ const PropertyFilters = ({ onFilterChange }) => {
         <input
           type="text"
           name="search"
-          value={filters.search}
+          value={filters.search || ''}
           onChange={handleFilterChange}
           placeholder="Search properties by location, name..."
           className="w-full pl-12 pr-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"

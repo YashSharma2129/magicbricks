@@ -27,21 +27,36 @@ requiredEnvVars.forEach(envVar => {
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-try {
-  await cloudinary.api.ping();
-  console.log('Cloudinary configuration verified successfully');
-} catch (error) {
-  console.error('Cloudinary configuration error:', error);
-  process.exit(1);
-}
+// CORS configuration
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://your-frontend-domain.com'] 
+    : ['http://localhost:5173', 'http://localhost:3000'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
-app.use(cors());
+// Body parser middleware
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
+// API routes
 app.use('/api/properties', propertyRoutes);
 app.use('/api/auth', authRoutes);
 
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ message: 'Something went wrong!' });
+});
+
+// Connect to MongoDB and start server
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => {
     console.log('MongoDB connected successfully');
@@ -51,3 +66,14 @@ mongoose.connect(process.env.MONGODB_URI)
     console.error('MongoDB connection error:', err.message);
     process.exit(1);
   });
+
+// Verify Cloudinary configuration
+try {
+  await cloudinary.api.ping();
+  console.log('Cloudinary configuration verified successfully');
+} catch (error) {
+  console.error('Cloudinary configuration error:', error);
+  process.exit(1);
+}
+
+export default app;

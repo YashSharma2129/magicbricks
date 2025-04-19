@@ -3,33 +3,35 @@ import { getProperties, getProperty, createProperty, updateProperty, deletePrope
 
 export const usePropertyStore = create((set, get) => ({
   properties: [],
-  loading: false,
-  error: null,
   filters: {
     search: '',
     propertyType: '',
     minPrice: '',
     maxPrice: '',
+    bedrooms: '',
+    bathrooms: '',
     furnished: '',
     sortBy: ''
   },
+  loading: false,
+  error: null,
+
+  setFilters: (filters) => set({ filters }),
 
   fetchProperties: async () => {
     set({ loading: true, error: null });
     try {
       const response = await getProperties(get().filters);
-      // Ensure we're setting an array of properties
       set({ 
-        properties: response.data.properties || [], 
+        properties: response.data.properties,
         loading: false 
       });
     } catch (error) {
       set({ 
-        error: error.message || 'Failed to fetch properties', 
+        error: error.message, 
         loading: false,
-        properties: [] 
+        properties: []
       });
-      throw error;
     }
   },
 

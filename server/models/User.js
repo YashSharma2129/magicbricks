@@ -18,10 +18,13 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  favoriteProperties: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Property'
-  }],
+  favoriteProperties: {
+    type: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Property'
+    }],
+    default: []
+  },
   role: {
     type: String,
     enum: ['user', 'admin'],

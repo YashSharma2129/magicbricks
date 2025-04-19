@@ -4,9 +4,10 @@ import { usePropertyStore } from '../store/propertyStore';
 import { useLoading } from '../hooks/useLoading';
 
 const Admin = () => {
-  const navigate = useNavigate(); // Fix the typo here as well
+  const navigate = useNavigate();
   const { addProperty } = usePropertyStore();
   const { setLoading } = useLoading();
+  const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     title: '',
     price: '',
@@ -35,7 +36,36 @@ const Admin = () => {
     }));
   };
 
-  const handleImageUpload = (e) => {
+  const compressImage = async (imageBase64) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Calculate new dimensions (max 1200px width/height)
+        let width = img.width;
+        let height = img.height;
+        if (width > height && width > 1200) {
+          height = Math.round((height * 1200) / width);
+          width = 1200;
+        } else if (height > 1200) {
+          width = Math.round((width * 1200) / height);
+          height = 1200;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        // Draw and compress
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.7)); // 70% quality JPEG
+      };
+      img.src = imageBase64;
+    });
+  };
+
+  const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files);
     const readers = files.map(file => {
       return new Promise((resolve) => {
@@ -45,68 +75,142 @@ const Admin = () => {
       });
     });
 
-    Promise.all(readers).then(results => {
-      setFormData(prev => ({ ...prev, images: [...prev.images, ...results] }));
-    });
+    try {
+      const imageResults = await Promise.all(readers);
+      const compressedImages = await Promise.all(
+        imageResults.map(img => compressImage(img))
+      );
+      setFormData(prev => ({ 
+        ...prev, 
+        images: [...prev.images, ...compressedImages]
+      }));
+    } catch (error) {
+      console.error('Error processing images:', error);
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
     setLoading(true);
+
+    // Form validation
+    if (!formData.location?.trim()) {
+      setError('Location is required');
+      setLoading(false);
+      return;
+    }
+
+    if (!formData.description?.trim()) {
+      setError('Description is required');
+      setLoading(false);
+      return;
+    }
+
     try {
-      await addProperty({
+      const propertyData = {
         ...formData,
-        price: Number(formData.price),
-        size: Number(formData.size),
-        bedrooms: Number(formData.bedrooms),
-        bathrooms: Number(formData.bathrooms)
-      });
+        price: Number(formData.price) || 0,
+        size: Number(formData.size) || 0,
+        bedrooms: formData.bedrooms ? Number(formData.bedrooms) : undefined,
+        bathrooms: formData.bathrooms ? Number(formData.bathrooms) : undefined,
+        // Ensure trimmed values for text fields
+        title: formData.title.trim(),
+        location: formData.location.trim(),
+        description: formData.description.trim(),
+        propertyType: formData.propertyType || undefined,
+        furnished: formData.furnished || undefined,
+        amenities: formData.amenities.length > 0 ? formData.amenities : undefined,
+        images: formData.images.length > 0 ? formData.images : undefined
+      };
+
+      Object.keys(propertyData).forEach(key => 
+        propertyData[key] === undefined && delete propertyData[key]
+      );
+
+      await addProperty(propertyData);
       navigate('/');
     } catch (error) {
-      console.error('Error adding property:', error);
+      const errorMessage = error?.response?.data?.message || error.message;
+      setError(errorMessage);
+      console.error('Error adding property:', errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-4xl mx-auto p-6">
       <h1 className="text-3xl font-bold mb-8">Add New Property</h1>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-6">
+          {error}
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
+          <div className="form-group">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
             <input
               type="text"
               name="title"
               value={formData.title}
               onChange={handleInputChange}
-              className="input-primary"
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               required
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Price</label>
+          <div className="form-group">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Price</label>
             <input
               type="number"
               name="price"
               value={formData.price}
               onChange={handleInputChange}
-              className="input-primary"
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               required
             />
           </div>
 
-          {/* ...existing code for other basic inputs... */}
+          <div className="col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+            <input
+              type="text"
+              name="location"
+              value={formData.location}
+              onChange={handleInputChange}
+              placeholder="Enter location (e.g., '12.9716,77.5946' for coordinates)"
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              required
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Enter location in the format "latitude,longitude" (e.g., "12.9716,77.5946")
+            </p>
+          </div>
 
           <div className="col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Property Type</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <textarea
+              name="description"
+              value={formData.description}
+              onChange={handleInputChange}
+              rows={4}
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              required
+              placeholder="Provide a detailed description of the property..."
+            />
+          </div>
+
+          <div className="col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Property Type</label>
             <select
               name="propertyType"
               value={formData.propertyType}
               onChange={handleInputChange}
-              className="input-primary"
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               required
             >
               <option value="">Select Type</option>
@@ -119,15 +223,15 @@ const Admin = () => {
           </div>
 
           <div className="col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Amenities</label>
+            <label className="block text-sm font-medium text-gray-700 mb-3">Amenities</label>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {['Parking', 'Garden', 'Security', 'Gym', 'Pool', 'Elevator'].map((amenity) => (
-                <label key={amenity} className="flex items-center space-x-2">
+                <label key={amenity} className="flex items-center space-x-2 text-sm text-gray-600">
                   <input
                     type="checkbox"
                     checked={formData.amenities.includes(amenity)}
                     onChange={() => handleAmenitiesChange(amenity)}
-                    className="rounded text-blue-600"
+                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
                   />
                   <span>{amenity}</span>
                 </label>
@@ -171,7 +275,10 @@ const Admin = () => {
           </div>
         </div>
 
-        <button type="submit" className="btn-primary w-full">
+        <button 
+          type="submit" 
+          className="btn-primary w-full"
+        >
           Add Property
         </button>
       </form>

@@ -8,30 +8,51 @@ import cloudinary from '../config/cloudinary.js';
 export const toggleFavorite = async (req, res) => {
   try {
     const property = await Property.findById(req.params.id);
+    
     if (!property) {
       return res.status(404).json({ message: 'Property not found' });
     }
 
-    // Use the model method to toggle favorite
-    const result = await property.toggleFavorite(req.user._id);
+    // Get current user ID as string for comparison
+    const userId = req.user._id.toString();
+    
+    const userIndex = property.favoritedBy.findIndex(id => id.toString() === userId);
+    
+    if (userIndex === -1) {
+      // Add to favorites
+      property.favoritedBy.push(userId);
+    } else {
+      // Remove from favorites using filter
+      property.favoritedBy = property.favoritedBy.filter(id => id.toString() !== userId);
+    }
+
+    // Update favoritesCount
+    property.favoritesCount = property.favoritedBy.length;
+
+    await property.save();
 
     // Update user's favorite properties
-    const user = await User.findById(req.user._id);
-    if (result.isFavorited) {
+    const user = await User.findById(userId);
+    if (userIndex === -1) {
+      // Add to user's favorites if not already present
       if (!user.favoriteProperties.includes(property._id)) {
         user.favoriteProperties.push(property._id);
       }
     } else {
+      // Remove from user's favorites
       user.favoriteProperties = user.favoriteProperties.filter(
         id => id.toString() !== property._id.toString()
       );
     }
     await user.save();
 
-    res.json(result);
+    res.json({
+      isFavorited: userIndex === -1,
+      favoritesCount: property.favoritedBy.length
+    });
   } catch (error) {
     console.error('Error toggling favorite:', error);
-    res.status(500).json({ message: 'Error toggling favorite' });
+    res.status(500).json({ message: 'Error toggling favorite', error: error.message });
   }
 };
 
@@ -109,7 +130,10 @@ export const getAllProperties = async (req, res) => {
 
     const skip = (page - 1) * limit;
 
-    // Execute query with pagination
+    // First, get the total count
+    const total = await Property.countDocuments(query);
+
+    // Then execute query with pagination
     const properties = await Property.find(query)
       .sort(sortOptions)
       .skip(skip)
@@ -347,9 +371,22 @@ export const deleteProperty = async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to delete this property' });
     }
 
+    // Delete associated images from Cloudinary
+    if (property.images && property.images.length > 0) {
+      for (const imageUrl of property.images) {
+        const publicId = imageUrl.split('/').pop().split('.')[0];
+        try {
+          await cloudinary.uploader.destroy(publicId);
+        } catch (error) {
+          console.error('Error deleting image from Cloudinary:', error);
+        }
+      }
+    }
+
     await Property.findByIdAndDelete(req.params.id);
     res.json({ message: 'Property deleted successfully' });
   } catch (error) {
+    console.error('Error deleting property:', error);
     res.status(500).json({ message: error.message });
   }
 };

@@ -15,6 +15,7 @@
     "@emotion/styled": "^11.11.0",
     "@headlessui/react": "^1.7.17",
     "@heroicons/react": "^2.0.18",
+    "@react-leaflet/core": "^3.0.0",
     "aos": "^2.3.4",
     "axios": "^1.6.2",
     "clsx": "^2.0.0",

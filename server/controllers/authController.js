@@ -112,12 +112,35 @@ export const login = async (req, res) => {
 
 export const getProfile = async (req, res) => {
   try {
+    // Use lean() for better performance and exclude password
     const user = await User.findById(req.user._id)
       .select('-password')
-      .populate('favorites');
+      .populate({
+        path: 'favoriteProperties',
+        select: 'title price location images propertyType' // Only select needed fields
+      })
+      .lean();
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Transform _id to string to avoid ObjectId issues
+    user._id = user._id.toString();
+    if (user.favoriteProperties) {
+      user.favoriteProperties = user.favoriteProperties.map(prop => ({
+        ...prop,
+        _id: prop._id.toString()
+      }));
+    }
+
     res.json(user);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Error fetching profile:', error);
+    res.status(500).json({ 
+      message: 'Error fetching profile', 
+      error: error.message 
+    });
   }
 };
 

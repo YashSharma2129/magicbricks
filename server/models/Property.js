@@ -33,10 +33,13 @@ const propertySchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
-  favoritedBy: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }],
+  favoritedBy: {
+    type: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }],
+    default: []
+  },
   favoritesCount: {
     type: Number,
     default: 0
@@ -81,14 +84,12 @@ const propertySchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// Add search index
 propertySchema.index({ 
   title: 'text', 
   description: 'text', 
   location: 'text' 
 });
 
-// Add a method to handle favorite toggling
 propertySchema.methods.toggleFavorite = async function(userId) {
   const isFavorited = this.favoritedBy.includes(userId);
   if (isFavorited) {
@@ -104,6 +105,14 @@ propertySchema.methods.toggleFavorite = async function(userId) {
     favoritesCount: this.favoritesCount
   };
 };
+
+// Add a pre-save middleware to ensure favoritesCount matches favoritedBy length
+propertySchema.pre('save', function(next) {
+  if (this.isModified('favoritedBy')) {
+    this.favoritesCount = this.favoritedBy.length;
+  }
+  next();
+});
 
 const Property = mongoose.model('Property', propertySchema);
 export default Property;
