@@ -2,10 +2,10 @@ import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import cloudinary from '../config/cloudinary.js';
+import cloudinary from './config/cloudinary.js';
 import sharp from 'sharp'; // ✅ fixed import
-import propertyRoutes from '../routes/propertyRoutes.js';
-import authRoutes from '../routes/authRoutes.js';
+import propertyRoutes from './routes/propertyRoutes.js';
+import authRoutes from './routes/authRoutes.js';
 
 dotenv.config();
 
