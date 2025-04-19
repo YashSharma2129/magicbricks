@@ -88,5 +88,22 @@ propertySchema.index({
   location: 'text' 
 });
 
+// Add a method to handle favorite toggling
+propertySchema.methods.toggleFavorite = async function(userId) {
+  const isFavorited = this.favoritedBy.includes(userId);
+  if (isFavorited) {
+    this.favoritedBy = this.favoritedBy.filter(id => id.toString() !== userId.toString());
+    this.favoritesCount = Math.max(0, this.favoritesCount - 1);
+  } else {
+    this.favoritedBy.push(userId);
+    this.favoritesCount += 1;
+  }
+  await this.save();
+  return {
+    isFavorited: !isFavorited,
+    favoritesCount: this.favoritesCount
+  };
+};
+
 const Property = mongoose.model('Property', propertySchema);
 export default Property;

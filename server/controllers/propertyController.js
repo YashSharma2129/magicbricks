@@ -5,60 +5,173 @@ import { createNotification } from '../utils/notifications.js';
 import sharp from 'sharp';
 import cloudinary from '../config/cloudinary.js';
 
+export const toggleFavorite = async (req, res) => {
+  try {
+    const property = await Property.findById(req.params.id);
+    if (!property) {
+      return res.status(404).json({ message: 'Property not found' });
+    }
+
+    // Use the model method to toggle favorite
+    const result = await property.toggleFavorite(req.user._id);
+
+    // Update user's favorite properties
+    const user = await User.findById(req.user._id);
+    if (result.isFavorited) {
+      if (!user.favoriteProperties.includes(property._id)) {
+        user.favoriteProperties.push(property._id);
+      }
+    } else {
+      user.favoriteProperties = user.favoriteProperties.filter(
+        id => id.toString() !== property._id.toString()
+      );
+    }
+    await user.save();
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error toggling favorite:', error);
+    res.status(500).json({ message: 'Error toggling favorite' });
+  }
+};
+
 export const getAllProperties = async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 12;
-    const skip = (page - 1) * limit;
-    
-    const { search, propertyType, minPrice, maxPrice, furnished, sortBy } = req.query;
-    let query = {};
+    const {
+      search,
+      propertyType,
+      minPrice,
+      maxPrice,
+      bedrooms,
+      bathrooms,
+      furnished,
+      sortBy,
+      page = 1,
+      limit = 12
+    } = req.query;
 
+    const query = {};
+
+    // Text search
     if (search) {
-      query.$text = { $search: search };
+      query.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { location: { $regex: search, $options: 'i' } }
+      ];
     }
+
+    // Property type filter
     if (propertyType) {
       query.propertyType = propertyType;
     }
+
+    // Price range filter
     if (minPrice || maxPrice) {
       query.price = {};
       if (minPrice) query.price.$gte = Number(minPrice);
       if (maxPrice) query.price.$lte = Number(maxPrice);
     }
+
+    // Bedrooms filter
+    if (bedrooms) {
+      query.bedrooms = Number(bedrooms);
+    }
+
+    // Bathrooms filter
+    if (bathrooms) {
+      query.bathrooms = Number(bathrooms);
+    }
+
+    // Furnished status filter
     if (furnished) {
       query.furnished = furnished;
     }
 
-    let sortQuery = {};
-    if (sortBy === 'price-asc') sortQuery.price = 1;
-    if (sortBy === 'price-desc') sortQuery.price = -1;
-    if (sortBy === 'latest') sortQuery.createdAt = -1;
+    // Sort options
+    let sortOptions = {};
+    switch (sortBy) {
+      case 'price-asc':
+        sortOptions.price = 1;
+        break;
+      case 'price-desc':
+        sortOptions.price = -1;
+        break;
+      case 'date-desc':
+        sortOptions.createdAt = -1;
+        break;
+      case 'date-asc':
+        sortOptions.createdAt = 1;
+        break;
+      default:
+        sortOptions.createdAt = -1; // Default sort by newest
+    }
 
-    const [properties, total] = await Promise.all([
-      Property.find(query)
-        .sort(sortQuery)
-        .skip(skip)
-        .limit(limit)
-        .populate('owner', 'name'),
-      Property.countDocuments(query)
-    ]);
+    const skip = (page - 1) * limit;
+
+    // Execute query with pagination
+    const properties = await Property.find(query)
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(Number(limit))
+      .populate('owner', 'name')
+      .lean();
+
+    // If user is authenticated, add isFavorited field
+    if (req.user) {
+      properties.forEach(property => {
+        property.isFavorited = property.favoritedBy?.includes(req.user._id);
+      });
+    }
 
     res.json({
       properties,
-      currentPage: page,
+      currentPage: Number(page),
       totalPages: Math.ceil(total / limit),
-      totalProperties: total
+      total
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Error fetching properties:', error);
+    res.status(500).json({ message: 'Error fetching properties' });
   }
 };
 
 export const createProperty = async (req, res) => {
-  const { images, location, ...propertyData } = req.body;
   try {
-    const optimizedImages = [];
-    // Parse coordinates from location string
+    const { images, location, ...propertyData } = req.body;
+
+    let optimizedImages = [];
+    if (Array.isArray(images) && images.length > 0) {
+      try {
+        // Process and upload each image
+        for (const imageBase64 of images) {
+          if (!imageBase64.startsWith('data:image')) {
+            console.error('Invalid image format');
+            continue;
+          }
+
+          try {
+            const result = await cloudinary.uploader.upload(imageBase64, {
+              folder: 'properties',
+              resource_type: 'auto',
+              // Add quality and transformation parameters
+              transformation: [
+                { width: 1200, height: 800, crop: "limit" },
+                { quality: "auto:good" }
+              ]
+            });
+            optimizedImages.push(result.secure_url);
+          } catch (uploadError) {
+            console.error('Cloudinary upload error:', uploadError);
+            // Continue with other images if one fails
+          }
+        }
+      } catch (imageProcessError) {
+        console.error('Image processing error:', imageProcessError);
+      }
+    }
+
+    // Parse coordinates from location string if provided
     let coordinates = {};
     if (location) {
       const [latitude, longitude] = location.split(',').map(coord => parseFloat(coord.trim()));
@@ -66,47 +179,27 @@ export const createProperty = async (req, res) => {
         coordinates = { latitude, longitude };
       }
     }
-    // Process and upload each image
-    for (const imageBase64 of images) {
-      const optimized = await sharp(Buffer.from(imageBase64.split(',')[1], 'base64'))
-        .resize(1200, 800, { fit: 'inside' })
-        .jpeg({ quality: 80 })
-        .toBuffer();
-      const result = await cloudinary.uploader.upload(
-        `data:image/jpeg;base64,${optimized.toString('base64')}`,
-        { folder: 'properties' }
-      );
-      optimizedImages.push(result.secure_url);
-    }    const newProp = new Property({
+
+    // Create new property with processed data
+    const newProperty = new Property({
       ...propertyData,
-      location,es,
-      coordinates,mizedImages,
+      location,
+      coordinates,
       images: optimizedImages,
       owner: req.user._id
     });
-    const saved = await newProp.save();
-    res.status(201).json(saved);
+
+    const savedProperty = await newProperty.save();
+    res.status(201).json(savedProperty);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    console.error('Error creating property:', error);
+    res.status(400).json({ 
+      message: error.message || 'Error creating property',
+      details: error.errors // Include mongoose validation errors if any
+    });
   }
 };
-export const toggleFavorite = async (req, res) => {
-  try {
-    const property = await Property.findById(req.params.id);
-    const isFavorited = property.favoritedBy.includes(req.user._id);
-    if (isFavorited) {
-      property.favoritedBy.pull(req.user._id);
-      property.favoritesCount--;
-    } else {
-      property.favoritedBy.push(req.user._id);
-      property.favoritesCount++;
-    }
-    await property.save();
-    res.json({ isFavorited: !isFavorited, favoritesCount: property.favoritesCount });
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-};
+
 export const addVirtualTour = async (req, res) => {
   try {
     const { tourUrl, provider } = req.body;
@@ -172,12 +265,18 @@ export const getPropertyById = async (req, res) => {
     const property = await Property.findById(req.params.id)
       .populate('owner', 'name email')
       .populate('ratings.reviews.user', 'name');
-    
+
     if (!property) {
       return res.status(404).json({ message: 'Property not found' });
     }
-    
-    res.json(property);
+
+    // Add isFavorited field if user is authenticated
+    const result = property.toObject();
+    if (req.user) {
+      result.isFavorited = property.favoritedBy.includes(req.user._id);
+    }
+
+    res.json(result);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
