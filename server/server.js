@@ -3,7 +3,6 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import cloudinary from './config/cloudinary.js';
-import sharp from 'sharp'; // ✅ fixed import
 import propertyRoutes from './routes/propertyRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 
@@ -24,6 +23,17 @@ requiredEnvVars.forEach(envVar => {
     process.exit(1);
   }
 });
+
+// Initialize sharp with error handling
+let sharpInstance;
+try {
+  const sharp = await import('sharp');
+  sharpInstance = sharp.default;
+  console.log('✅ Sharp initialized successfully');
+} catch (error) {
+  console.error('❌ Error initializing Sharp:', error);
+  process.exit(1);
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;
