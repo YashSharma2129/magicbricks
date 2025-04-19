@@ -2,7 +2,7 @@
 import Property from '../models/Property.js';
 import User from '../models/User.js';
 import { createNotification } from '../utils/notifications.js';
-import sharp from 'sharp';
+import { optimizeImage } from '../config/sharp.js';
 import cloudinary from '../config/cloudinary.js';
 
 export const toggleFavorite = async (req, res) => {
@@ -175,19 +175,32 @@ export const createProperty = async (req, res) => {
           }
 
           try {
-            const result = await cloudinary.uploader.upload(imageBase64, {
-              folder: 'properties',
-              resource_type: 'auto',
-              // Add quality and transformation parameters
-              transformation: [
-                { width: 1200, height: 800, crop: "limit" },
-                { quality: "auto:good" }
-              ]
+            // Convert base64 to buffer
+            const imageBuffer = Buffer.from(
+              imageBase64.replace(/^data:image\/\w+;base64,/, ''),
+              'base64'
+            );
+
+            // Optimize image
+            const optimizedBuffer = await optimizeImage(imageBuffer, {
+              width: 1200,
+              height: 800,
+              fit: 'inside',
+              format: 'jpeg',
+              quality: 80
             });
+
+            // Upload to Cloudinary
+            const result = await cloudinary.uploader.upload(
+              `data:image/jpeg;base64,${optimizedBuffer.toString('base64')}`,
+              {
+                folder: 'properties',
+                resource_type: 'auto'
+              }
+            );
             optimizedImages.push(result.secure_url);
           } catch (uploadError) {
-            console.error('Cloudinary upload error:', uploadError);
-            // Continue with other images if one fails
+            console.error('Image processing/upload error:', uploadError);
           }
         }
       } catch (imageProcessError) {

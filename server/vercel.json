@@ -3,7 +3,10 @@
   "builds": [
     {
       "src": "server.js",
-      "use": "@vercel/node"
+      "use": "@vercel/node",
+      "config": {
+        "installCommand": "npm install --platform=linux --arch=x64 sharp"
+      }
     }
   ],
   "routes": [
@@ -17,6 +20,7 @@
     }
   ],
   "env": {
-    "NODE_ENV": "production"
+    "NODE_ENV": "production",
+    "SHARP_IGNORE_GLOBAL_LIBVIPS": "1"
   }
 }
