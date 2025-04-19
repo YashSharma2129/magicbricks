@@ -1,0 +1,100 @@
+/* Base styles */
+@layer base {
+  body {
+    @apply bg-gray-50;
+  }
+
+  input, select, textarea {
+    @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors;
+  }
+
+  button {
+    @apply transition-all duration-200 ease-in-out;
+  }
+}
+
+/* Component styles */
+.btn-primary {
+  @apply bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+}
+
+.btn-secondary {
+  @apply bg-gray-100 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-200 active:bg-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2;
+}
+
+.input-primary {
+  @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
+}
+
+.card-hover {
+  @apply transition-transform duration-300 hover:-translate-y-1 hover:shadow-lg;
+}
+
+/* Property card styles */
+.property-card {
+  @apply bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-all duration-300;
+}
+
+.property-card img {
+  @apply w-full h-48 object-cover transition-transform duration-300;
+}
+
+.property-card:hover img {
+  @apply scale-105;
+}
+
+/* Form styles */
+.form-group {
+  @apply space-y-2 mb-4;
+}
+
+.form-label {
+  @apply block text-sm font-medium text-gray-700;
+}
+
+.form-error {
+  @apply text-red-500 text-sm mt-1;
+}
+
+/* Animation classes */
+.fade-in {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+.slide-up {
+  animation: slideUp 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Loading spinner styles */
+.loading-spinner {
+  @apply w-12 h-12 border-4 border-blue-200 rounded-full animate-spin;
+  border-top-color: #3B82F6;
+}
+
+/* Layout styles */
+.container {
+  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+.section {
+  @apply py-12;
+}
+
+/* Responsive utilities */
+.mobile-only {
+  @apply block md:hidden;
+}
+
+.desktop-only {
+  @apply hidden md:block;
+}
